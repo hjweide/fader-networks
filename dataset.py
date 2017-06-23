@@ -6,7 +6,7 @@ from os.path import join
 
 
 class Dataset(data.Dataset):
-    def __init__(self, data_dir, filenames):
+    def __init__(self, data_dir, filenames, input_transform, target_transform):
         super(Dataset, self).__init__()
         image_dir = join(data_dir, 'img_align_celeba')
         # index_col=False to include the filename column
@@ -18,15 +18,16 @@ class Dataset(data.Dataset):
 
         self.image_filenames = [join(image_dir, x) for x in filenames]
         attrs = np.vstack(fname_to_attr[fname] for fname in filenames)
-        attrs[attrs == -1] = 0
         self.attribute_names  = df.columns.values
         self.attribute_values = attrs
+        self.input_transform = input_transform
+        self.target_transform = target_transform
 
     def __getitem__(self, index):
-        x = Image.Open(self.image_filenames[index])
-        y = self.attributes[index]
+        x = self.input_transform(Image.open(self.image_filenames[index]))
+        y = self.target_transform(self.attribute_values[index])
 
         return x, y
 
-    def __len__(self, index):
+    def __len__(self):
         return len(self.image_filenames)
