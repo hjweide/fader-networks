@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from data import split_train_val_test
+from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
 
@@ -44,7 +46,7 @@ class EncoderDecoder(nn.Module):
         self.batch_norm13 = nn.BatchNorm2d(16)
         self.conv14 = nn.ConvTranspose2d(16 + 2 * self.num_attr, 3, k, s, p)
 
-    def forward(self, x):
+    def forward(self, x, y):
         x = self.lrelu(self.batch_norm1(self.conv1(x)))
         x = self.lrelu(self.batch_norm2(self.conv2(x)))
         x = self.lrelu(self.batch_norm3(self.conv3(x)))
@@ -55,31 +57,31 @@ class EncoderDecoder(nn.Module):
         z = self.lrelu(self.batch_norm7(self.conv7(x)))
 
         # should not be random, should be 0/1 based on y
-        attrs = np.random.random((8, 2 * self.num_attr, 2, 2)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 2, 2)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((z, attrs), 1)
         x_hat = self.relu(self.batch_norm8(self.conv8(x_hat)))
-        attrs = np.random.random((8, 2 * self.num_attr, 4, 4)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 4, 4)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm9(self.conv9(x_hat)))
-        attrs = np.random.random((8, 2 * self.num_attr, 8, 8)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 8, 8)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm10(self.conv10(x_hat)))
-        attrs = np.random.random((8, 2 * self.num_attr, 16, 16)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 16, 16)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm11(self.conv11(x_hat)))
-        attrs = np.random.random((8, 2 * self.num_attr, 32, 32)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 32, 32)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm12(self.conv12(x_hat)))
-        attrs = np.random.random((8, 2 * self.num_attr, 64, 64)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 64, 64)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm13(self.conv13(x_hat)))
-        attrs = np.random.random((8, 2 * self.num_attr, 128, 128)).astype(np.float32)
+        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 128, 128)).astype(np.float32)
         attrs = Variable(torch.from_numpy(attrs).float())
         x_hat = torch.cat((x_hat, attrs), 1)
 
@@ -112,9 +114,15 @@ class Discriminator(nn.Module):
 
 
 def train_fader_network():
-    num_attr = 4
+    num_attr = 39
     encoder_decoder = EncoderDecoder(num_attr)
     discriminator   = Discriminator(num_attr)
+
+    train, valid, test = split_train_val_test('data')
+
+    train_iter = DataLoader(train, batch_size=32, shuffle=True)
+    valid_iter = DataLoader(valid, batch_size=32, shuffle=False)
+
     max_epochs = 1000
     lr, beta1 = 1e-3, 0.5
     adversarial_optimizer = optim.Adam(encoder_decoder.parameters(),
@@ -125,22 +133,24 @@ def train_fader_network():
     bce_loss = nn.BCELoss(size_average=True)
 
     for epoch in range(1, max_epochs):
-        adversarial_optimizer.zero_grad()
-        attrs = torch.from_numpy(np.random.randint(0, 2, (8, 4))).float()
-        images = torch.from_numpy(np.random.random((8, 3, 256, 256)) * 2 - 1).float()
-        y = Variable(attrs, requires_grad=False)
-        x = Variable(images, requires_grad=True)
-        t = Variable(images, requires_grad=False)
-        z, x_hat = encoder_decoder(x)
-        print z.data.cpu().numpy().shape
-        y_hat = discriminator(z)
-        loss = mse_loss(x_hat, t) + bce_loss(y_hat, y)
-        print y_hat.data.cpu().numpy().shape
-        print y.data.cpu().numpy().shape
-        loss = bce_loss(y_hat, y)
-        loss.backward()
-        adversarial_optimizer.step()
-        print('%d: %.6f' % (epoch, loss.data[0]))
+        for iteration, batch in enumerate(train_iter, start=1):
+            #print batch[0].numpy().shape
+            #print batch[1].numpy().shape
+            x, y = Variable(batch[0]), Variable(batch[1])
+
+            adversarial_optimizer.zero_grad()
+            #y = Variable(attrs, requires_grad=False)
+            #x = Variable(images, requires_grad=True)
+            #t = Variable(images, requires_grad=False)
+            z, x_hat = encoder_decoder(x, y)
+            #print z.data.cpu().numpy().shape
+            y_hat = discriminator(z)
+            print y_hat.data.cpu().numpy().shape
+            print y.data.cpu().numpy().shape
+            loss = mse_loss(x_hat, x) + bce_loss(y_hat, y)
+            loss.backward()
+            adversarial_optimizer.step()
+            print('%d: %.6f' % (epoch, loss.data[0]))
 
 
 if __name__ == '__main__':
