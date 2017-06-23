@@ -133,24 +133,33 @@ def train_fader_network():
     bce_loss = nn.BCELoss(size_average=True)
 
     for epoch in range(1, max_epochs):
+        print('epoch: %d' % (epoch))
         for iteration, batch in enumerate(train_iter, start=1):
-            #print batch[0].numpy().shape
-            #print batch[1].numpy().shape
             x, y = Variable(batch[0]), Variable(batch[1])
-
             adversarial_optimizer.zero_grad()
-            #y = Variable(attrs, requires_grad=False)
-            #x = Variable(images, requires_grad=True)
-            #t = Variable(images, requires_grad=False)
             z, x_hat = encoder_decoder(x, y)
-            #print z.data.cpu().numpy().shape
-            y_hat = discriminator(z)
-            print y_hat.data.cpu().numpy().shape
-            print y.data.cpu().numpy().shape
-            loss = mse_loss(x_hat, x) + bce_loss(y_hat, y)
-            loss.backward()
+
+            # send the output of the encoder as a new Variable that is not
+            # part of the backward pass
+            # not sure if this is the correct way to do so
+            # https://discuss.pytorch.org/t/how-to-copy-a-variable-in-a-network-graph/1603/9
+            z_in = Variable(z.data, requires_grad=False)
+            discriminator_optimizer.zero_grad()
+            y_hat = discriminator(z_in)
+
+            # adversarial loss
+            y_in = Variable(y_hat.data, requires_grad=False)
+            advers_loss = mse_loss(x_hat, x) + bce_loss(y_in, 1 - y)
+            advers_loss.backward()
             adversarial_optimizer.step()
-            print('%d: %.6f' % (epoch, loss.data[0]))
+
+            # discriminative loss
+            discrim_loss = bce_loss(y_hat, y)
+            discrim_loss.backward()
+            discriminator_optimizer.step()
+
+            print('%d: adv. loss = %.6f' % (iteration, advers_loss.data[0]))
+            print('%d: dsc. loss = %.6f' % (iteration, discrim_loss.data[0]))
 
 
 if __name__ == '__main__':
