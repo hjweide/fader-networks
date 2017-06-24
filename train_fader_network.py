@@ -9,9 +9,10 @@ from torch.autograd import Variable
 
 
 class EncoderDecoder(nn.Module):
-    def __init__(self, num_attr):
+    def __init__(self, num_attr, use_cuda=True):
         super(EncoderDecoder, self).__init__()
 
+        self.use_cuda = use_cuda
         self.num_attr = num_attr
         self.relu = nn.ReLU()
         self.lrelu = nn.LeakyReLU(negative_slope=0.2)
@@ -48,8 +49,10 @@ class EncoderDecoder(nn.Module):
 
     # takes a binary target and converts it to constant conv maps
     def _const_input(self, y, h, w):
-        dummy = Variable(torch.ones((y.size()[0], y.size()[1], h, w)).float(),
-                         requires_grad=False)
+        data = torch.ones((y.size()[0], y.size()[1], h, w)).float()
+        if self.use_cuda:
+            data = data.cuda()
+        dummy = Variable(data, requires_grad=False)
         # broadcast over the height, width conv. dimensions
         z = y[:, :, None, None] * dummy
 
@@ -115,9 +118,14 @@ class Discriminator(nn.Module):
 
 
 def train_fader_network():
+    use_cuda = True
     num_attr = 39
     encoder_decoder = EncoderDecoder(num_attr)
     discriminator   = Discriminator(num_attr)
+
+    if use_cuda:
+        encoder_decoder.cuda()
+        discriminator.cuda()
 
     train, valid, test = split_train_val_test('data')
 
@@ -135,10 +143,10 @@ def train_fader_network():
 
     for epoch in range(1, max_epochs):
         print('epoch: %d' % (epoch))
-        for iteration, batch in enumerate(train_iter, start=1):
-            x = Variable(batch[0])
-            yb = Variable(batch[1])
-            yt = Variable(batch[2])
+        for iteration, (x, yb, yt) in enumerate(train_iter, start=1):
+            if use_cuda:
+                x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
+            x, yb, yt = Variable(x), Variable(yb), Variable(yt)
             print yb.data.cpu().numpy().shape
             print yt.data.cpu().numpy().shape
             adversarial_optimizer.zero_grad()
