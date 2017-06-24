@@ -141,14 +141,16 @@ def train_fader_network():
     mse_loss = nn.MSELoss(size_average=True)
     bce_loss = nn.BCELoss(size_average=True)
 
+    lambda_e = np.linspace(0, 1e-4, 500000)
+
     for epoch in range(1, max_epochs):
-        print('epoch: %d' % (epoch))
+        print('Train epoch: %d' % (epoch))
         for iteration, (x, yb, yt) in enumerate(train_iter, start=1):
             if use_cuda:
                 x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
             x, yb, yt = Variable(x), Variable(yb), Variable(yt)
-            print yb.data.cpu().numpy().shape
-            print yt.data.cpu().numpy().shape
+            #print yb.data.cpu().numpy().shape
+            #print yt.data.cpu().numpy().shape
             adversarial_optimizer.zero_grad()
             z, x_hat = encoder_decoder(x, yb)
 
@@ -162,7 +164,12 @@ def train_fader_network():
 
             # adversarial loss
             y_in = Variable(y_hat.data, requires_grad=False)
-            advers_loss = mse_loss(x_hat, x) + bce_loss(y_in, 1 - yt)
+            le_idx = min(500000 - 1, epoch * (iteration + 1))
+            le_val = Variable(torch.FloatTensor([lambda_e[le_idx]]).float(),
+                              requires_grad=False)
+            if use_cuda:
+                le_val = le_val.cuda()
+            advers_loss = mse_loss(x_hat, x) + le_val * bce_loss(y_in, 1 - yt)
             advers_loss.backward()
             adversarial_optimizer.step()
 
@@ -171,8 +178,10 @@ def train_fader_network():
             discrim_loss.backward()
             discriminator_optimizer.step()
 
-            print('%d: adv. loss = %.6f' % (iteration, advers_loss.data[0]))
-            print('%d: dsc. loss = %.6f' % (iteration, discrim_loss.data[0]))
+            print(' Iteration %d (lambda_e = %.2e)' % (
+                iteration, le_val.data[0]))
+            print('  adv. loss = %.6f' % (advers_loss.data[0]))
+            print('  dsc. loss = %.6f' % (discrim_loss.data[0]))
 
 
 if __name__ == '__main__':
