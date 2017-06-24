@@ -6,7 +6,8 @@ from os.path import join
 
 
 class Dataset(data.Dataset):
-    def __init__(self, data_dir, filenames, input_transform, target_transform):
+    def __init__(self, data_dir, filenames, input_transform,
+                 target_transform, target_transform_binary):
         super(Dataset, self).__init__()
         image_dir = join(data_dir, 'img_align_celeba')
         # index_col=False to include the filename column
@@ -22,12 +23,14 @@ class Dataset(data.Dataset):
         self.attribute_values = attrs
         self.input_transform = input_transform
         self.target_transform = target_transform
+        self.target_transform_binary = target_transform_binary
 
     def __getitem__(self, index):
         x = self.input_transform(Image.open(self.image_filenames[index]))
-        y = self.target_transform(self.attribute_values[index])
+        yb = self.target_transform_binary(self.attribute_values[index])
+        yt = self.target_transform(self.attribute_values[index])
 
-        return x, y
+        return x, yb, yt
 
     def __len__(self):
         return len(self.image_filenames)

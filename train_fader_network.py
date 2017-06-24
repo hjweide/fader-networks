@@ -46,6 +46,15 @@ class EncoderDecoder(nn.Module):
         self.batch_norm13 = nn.BatchNorm2d(16)
         self.conv14 = nn.ConvTranspose2d(16 + 2 * self.num_attr, 3, k, s, p)
 
+    # takes a binary target and converts it to constant conv maps
+    def _const_input(self, y, h, w):
+        dummy = Variable(torch.ones((y.size()[0], y.size()[1], h, w)).float(),
+                         requires_grad=False)
+        # broadcast over the height, width conv. dimensions
+        z = y[:, :, None, None] * dummy
+
+        return z
+
     def forward(self, x, y):
         x = self.lrelu(self.batch_norm1(self.conv1(x)))
         x = self.lrelu(self.batch_norm2(self.conv2(x)))
@@ -56,33 +65,25 @@ class EncoderDecoder(nn.Module):
         # latent representation, i.e., encoding of x
         z = self.lrelu(self.batch_norm7(self.conv7(x)))
 
-        # should not be random, should be 0/1 based on y
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 2, 2)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 2, 2)
         x_hat = torch.cat((z, attrs), 1)
         x_hat = self.relu(self.batch_norm8(self.conv8(x_hat)))
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 4, 4)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 4, 4)
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm9(self.conv9(x_hat)))
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 8, 8)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 8, 8)
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm10(self.conv10(x_hat)))
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 16, 16)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 16, 16)
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm11(self.conv11(x_hat)))
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 32, 32)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 32, 32)
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm12(self.conv12(x_hat)))
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 64, 64)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 64, 64)
         x_hat = torch.cat((x_hat, attrs), 1)
         x_hat = self.relu(self.batch_norm13(self.conv13(x_hat)))
-        attrs = np.random.random((y.size()[0], 2 * self.num_attr, 128, 128)).astype(np.float32)
-        attrs = Variable(torch.from_numpy(attrs).float())
+        attrs = self._const_input(y, 128, 128)
         x_hat = torch.cat((x_hat, attrs), 1)
 
         # decoder output, i.e., reconstruction of x
@@ -135,9 +136,13 @@ def train_fader_network():
     for epoch in range(1, max_epochs):
         print('epoch: %d' % (epoch))
         for iteration, batch in enumerate(train_iter, start=1):
-            x, y = Variable(batch[0]), Variable(batch[1])
+            x = Variable(batch[0])
+            yb = Variable(batch[1])
+            yt = Variable(batch[2])
+            print yb.data.cpu().numpy().shape
+            print yt.data.cpu().numpy().shape
             adversarial_optimizer.zero_grad()
-            z, x_hat = encoder_decoder(x, y)
+            z, x_hat = encoder_decoder(x, yb)
 
             # send the output of the encoder as a new Variable that is not
             # part of the backward pass
@@ -149,12 +154,12 @@ def train_fader_network():
 
             # adversarial loss
             y_in = Variable(y_hat.data, requires_grad=False)
-            advers_loss = mse_loss(x_hat, x) + bce_loss(y_in, 1 - y)
+            advers_loss = mse_loss(x_hat, x) + bce_loss(y_in, 1 - yt)
             advers_loss.backward()
             adversarial_optimizer.step()
 
             # discriminative loss
-            discrim_loss = bce_loss(y_hat, y)
+            discrim_loss = bce_loss(y_hat, yt)
             discrim_loss.backward()
             discriminator_optimizer.step()
 
