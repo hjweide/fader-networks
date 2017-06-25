@@ -2,8 +2,21 @@ import pandas as pd
 import numpy as np
 import torch
 from dataset import Dataset
+from PIL import Image
 from os.path import join
 from torchvision.transforms import Compose, CenterCrop, ToTensor, Scale, Lambda
+
+
+def plot_samples(x, x_hat, prefix=''):
+    x = x.data.cpu().numpy().transpose(0, 2, 3, 1)
+    x_hat = x_hat.data.cpu().numpy().transpose(0, 2, 3, 1)
+
+    for i in range(x.shape[0]):
+        fpath = join('data', 'samples', '%s_%d.png' % (prefix, i))
+        print x_hat[i].min(), x_hat[i].max()
+        out = np.hstack((255 * ((x[i] + 1) / 2), 255 * x_hat[i]))
+        img = Image.fromarray(out.astype(np.uint8))
+        img.save(fpath)
 
 
 def input_transform(crop_size):

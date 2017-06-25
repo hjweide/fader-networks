@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from data import split_train_val_test
+from data import split_train_val_test, plot_samples
+from os.path import join
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
@@ -120,6 +121,9 @@ class Discriminator(nn.Module):
 def train_fader_network():
     use_cuda = True
     num_attr = 39
+    sample_every = 10
+    encoder_decoder_fpath = join('data', 'weights', 'adver.params')
+    discriminator_fpath = join('data', 'weights', 'discr.params')
     encoder_decoder = EncoderDecoder(num_attr)
     discriminator   = Discriminator(num_attr)
 
@@ -143,45 +147,56 @@ def train_fader_network():
 
     lambda_e = np.linspace(0, 1e-4, 500000)
 
-    for epoch in range(1, max_epochs):
-        print('Train epoch: %d' % (epoch))
-        for iteration, (x, yb, yt) in enumerate(train_iter, start=1):
-            if use_cuda:
-                x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
-            x, yb, yt = Variable(x), Variable(yb), Variable(yt)
-            #print yb.data.cpu().numpy().shape
-            #print yt.data.cpu().numpy().shape
-            adversarial_optimizer.zero_grad()
-            z, x_hat = encoder_decoder(x, yb)
+    try:
+        for epoch in range(1, max_epochs):
+            print('Train epoch: %d' % (epoch))
+            for iteration, (x, yb, yt) in enumerate(train_iter, start=1):
+                if use_cuda:
+                    x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
+                x, yb, yt = Variable(x), Variable(yb), Variable(yt)
+                #print yb.data.cpu().numpy().shape
+                #print yt.data.cpu().numpy().shape
+                adversarial_optimizer.zero_grad()
+                z, x_hat = encoder_decoder(x, yb)
 
-            # send the output of the encoder as a new Variable that is not
-            # part of the backward pass
-            # not sure if this is the correct way to do so
-            # https://discuss.pytorch.org/t/how-to-copy-a-variable-in-a-network-graph/1603/9
-            z_in = Variable(z.data, requires_grad=False)
-            discriminator_optimizer.zero_grad()
-            y_hat = discriminator(z_in)
+                if (epoch == 1) or (epoch % sample_every == 0):
+                    plot_samples(x, x_hat, prefix='train_%d_%d' % (
+                        epoch, iteration))
 
-            # adversarial loss
-            y_in = Variable(y_hat.data, requires_grad=False)
-            le_idx = min(500000 - 1, epoch * (iteration + 1))
-            le_val = Variable(torch.FloatTensor([lambda_e[le_idx]]).float(),
-                              requires_grad=False)
-            if use_cuda:
-                le_val = le_val.cuda()
-            advers_loss = mse_loss(x_hat, x) + le_val * bce_loss(y_in, 1 - yt)
-            advers_loss.backward()
-            adversarial_optimizer.step()
+                # send the output of the encoder as a new Variable that is not
+                # part of the backward pass
+                # not sure if this is the correct way to do so
+                # https://discuss.pytorch.org/t/how-to-copy-a-variable-in-a-network-graph/1603/9
+                z_in = Variable(z.data, requires_grad=False)
+                discriminator_optimizer.zero_grad()
+                y_hat = discriminator(z_in)
 
-            # discriminative loss
-            discrim_loss = bce_loss(y_hat, yt)
-            discrim_loss.backward()
-            discriminator_optimizer.step()
+                # adversarial loss
+                y_in = Variable(y_hat.data, requires_grad=False)
+                le_idx = min(500000 - 1, epoch * (iteration + 1))
+                le_val = Variable(torch.FloatTensor([lambda_e[le_idx]]).float(),
+                                  requires_grad=False)
+                if use_cuda:
+                    le_val = le_val.cuda()
+                advers_loss = mse_loss(x_hat, x) + le_val * bce_loss(y_in, 1 - yt)
+                advers_loss.backward()
+                adversarial_optimizer.step()
 
-            print(' Iteration %d (lambda_e = %.2e)' % (
-                iteration, le_val.data[0]))
-            print('  adv. loss = %.6f' % (advers_loss.data[0]))
-            print('  dsc. loss = %.6f' % (discrim_loss.data[0]))
+                # discriminative loss
+                discrim_loss = bce_loss(y_hat, yt)
+                discrim_loss.backward()
+                discriminator_optimizer.step()
+
+                print(' Iteration %d (lambda_e = %.2e)' % (
+                    iteration, le_val.data[0]))
+                print('  adv. loss = %.6f' % (advers_loss.data[0]))
+                print('  dsc. loss = %.6f' % (discrim_loss.data[0]))
+    except KeyboardInterrupt:
+        print('Caught Ctrl-C, interrupting training.')
+    print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))
+    torch.save(encoder_decoder.state_dict(), encoder_decoder_fpath)
+    print('Saving discriminator parameters to %s' % (discriminator_fpath))
+    torch.save(discriminator.state_dict(), discriminator_fpath)
 
 
 if __name__ == '__main__':
