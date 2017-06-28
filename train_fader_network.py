@@ -16,6 +16,7 @@ class EncoderDecoder(nn.Module):
         self.use_cuda = use_cuda
         self.num_attr = num_attr
         self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
         self.lrelu = nn.LeakyReLU(negative_slope=0.2)
         # in, out, kernel, stride, padding
         k, s, p = (4, 4), (2, 2), (1, 1)
@@ -91,7 +92,7 @@ class EncoderDecoder(nn.Module):
         x_hat = torch.cat((x_hat, attrs), 1)
 
         # decoder output, i.e., reconstruction of x
-        x_hat = self.relu(self.conv14(x_hat))
+        x_hat = self.tanh(self.conv14(x_hat))
 
         return z, x_hat
 
@@ -137,7 +138,7 @@ def train_fader_network():
     valid_iter = DataLoader(valid, batch_size=32, shuffle=False)
 
     max_epochs = 1000
-    lr, beta1 = 1e-3, 0.5
+    lr, beta1 = 2e-3, 0.5
     adversarial_optimizer = optim.Adam(encoder_decoder.parameters(),
                                        lr=lr, betas=(beta1, 0.999))
     discriminator_optimizer = optim.Adam(discriminator.parameters(),
@@ -159,7 +160,8 @@ def train_fader_network():
                 adversarial_optimizer.zero_grad()
                 z, x_hat = encoder_decoder(x, yb)
 
-                if (epoch == 1) or (epoch % sample_every == 0):
+                #if (epoch == 1) or (epoch % sample_every == 0):
+                if (epoch % sample_every == 0):
                     plot_samples(x, x_hat, prefix='train_%d_%d' % (
                         epoch, iteration))
 
@@ -174,11 +176,13 @@ def train_fader_network():
                 # adversarial loss
                 y_in = Variable(y_hat.data, requires_grad=False)
                 le_idx = min(500000 - 1, epoch * (iteration + 1))
-                le_val = Variable(torch.FloatTensor([lambda_e[le_idx]]).float(),
-                                  requires_grad=False)
+                le_val = Variable(
+                    torch.FloatTensor([lambda_e[le_idx]]).float(),
+                    requires_grad=False)
                 if use_cuda:
                     le_val = le_val.cuda()
-                advers_loss = mse_loss(x_hat, x) + le_val * bce_loss(y_in, 1 - yt)
+                advers_loss = mse_loss(x_hat, x) +\
+                    le_val * bce_loss(y_in, 1 - yt)
                 advers_loss.backward()
                 adversarial_optimizer.step()
 
@@ -187,10 +191,30 @@ def train_fader_network():
                 discrim_loss.backward()
                 discriminator_optimizer.step()
 
-                print(' Iteration %d (lambda_e = %.2e)' % (
+                print(' Train iteration %d (lambda_e = %.2e)' % (
                     iteration, le_val.data[0]))
                 print('  adv. loss = %.6f' % (advers_loss.data[0]))
                 print('  dsc. loss = %.6f' % (discrim_loss.data[0]))
+
+            for iteration, (x, xb, yt) in enumerate(valid_iter, start=1):
+                if use_cuda:
+                    x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
+                x, yb, yt = Variable(x), Variable(yb), Variable(yt)
+                z, x_hat = encoder_decoder(x, yb)
+
+                if (epoch % sample_every == 0):
+                    plot_samples(x, x_hat, prefix='valid_%d_%d' % (
+                        epoch, iteration))
+
+                z_in = Variable(z.data, requires_grad=False)
+                y_hat = discriminator(z_in)
+                valid_advers_loss = mse_loss(x_hat, x) +\
+                    le_val * bce_loss(y_in, 1 - yt)
+                valid_discrim_loss = bce_loss(y_hat, yt)
+                print(' Valid iteration %d (lambda_e = %.2e)' % (
+                    iteration, le_val.data[0]))
+                print('  adv. loss = %.6f' % (valid_advers_loss.data[0]))
+                print('  dsc. loss = %.6f' % (valid_discrim_loss.data[0]))
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')
     print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))

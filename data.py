@@ -13,8 +13,7 @@ def plot_samples(x, x_hat, prefix=''):
 
     for i in range(x.shape[0]):
         fpath = join('data', 'samples', '%s_%d.png' % (prefix, i))
-        print x_hat[i].min(), x_hat[i].max()
-        out = np.hstack((255 * ((x[i] + 1) / 2), 255 * x_hat[i]))
+        out = np.hstack((255 * ((x[i] + 1) / 2), 255 * ((x_hat[i] + 1) / 2)))
         img = Image.fromarray(out.astype(np.uint8))
         img.save(fpath)
 
