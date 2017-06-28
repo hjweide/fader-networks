@@ -5,6 +5,7 @@ from dataset import Dataset
 from PIL import Image
 from os.path import join
 from torchvision.transforms import Compose, CenterCrop, ToTensor, Scale, Lambda
+from torchvision.transforms import RandomHorizontalFlip
 
 
 def plot_samples(x, x_hat, prefix=''):
@@ -19,6 +20,16 @@ def plot_samples(x, x_hat, prefix=''):
 
 
 def input_transform(crop_size):
+    return Compose([
+        CenterCrop(crop_size),
+        Scale(256),
+        RandomHorizontalFlip(),
+        ToTensor(),                   # [0, 255] --> [ 0., 1.]
+        Lambda(lambda x: 2 * x - 1),  # [0., 1.] --> [-1., 1.]
+    ])
+
+
+def input_transform_augment(crop_size):
     return Compose([
         CenterCrop(crop_size),
         Scale(256),
@@ -60,7 +71,7 @@ def split_train_val_test(data_dir):
     test_filenames  = filenames[labels == 2]
 
     train_set = Dataset(
-        data_dir, train_filenames, input_transform(178),
+        data_dir, train_filenames, input_transform_augment(178),
         target_transform(), target_transform_binary()
     )
     valid_set = Dataset(
