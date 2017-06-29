@@ -122,7 +122,7 @@ class Discriminator(nn.Module):
 def train_fader_network():
     use_cuda = True
     num_attr = 39
-    sample_every = 10
+    #sample_every = 10
     encoder_decoder_fpath = join('data', 'weights', 'adver.params')
     discriminator_fpath = join('data', 'weights', 'discr.params')
     encoder_decoder = EncoderDecoder(num_attr)
@@ -136,6 +136,7 @@ def train_fader_network():
 
     train_iter = DataLoader(train, batch_size=32, shuffle=True)
     valid_iter = DataLoader(valid, batch_size=32, shuffle=False)
+    #test_iter  = DataLoader(test, batch_size=32, shuffle=False)
 
     max_epochs = 1000
     lr, beta1 = 2e-3, 0.5
@@ -161,9 +162,9 @@ def train_fader_network():
                 z, x_hat = encoder_decoder(x, yb)
 
                 #if (epoch == 1) or (epoch % sample_every == 0):
-                if (epoch % sample_every == 0):
-                    plot_samples(x, x_hat, prefix='train_%d_%d' % (
-                        epoch, iteration))
+                #if (epoch % sample_every == 0):
+                #    plot_samples(x, x_hat, prefix='train_%d_%d' % (
+                #        epoch, iteration))
 
                 # send the output of the encoder as a new Variable that is not
                 # part of the backward pass
@@ -191,30 +192,30 @@ def train_fader_network():
                 discrim_loss.backward()
                 discriminator_optimizer.step()
 
-                print(' Train iteration %d (lambda_e = %.2e)' % (
-                    iteration, le_val.data[0]))
+                print(' Train epoch %d, iter %d (lambda_e = %.2e)' % (
+                    epoch, iteration, le_val.data[0]))
                 print('  adv. loss = %.6f' % (advers_loss.data[0]))
                 print('  dsc. loss = %.6f' % (discrim_loss.data[0]))
 
-            for iteration, (x, xb, yt) in enumerate(valid_iter, start=1):
+            for iteration, (x, yb, yt) in enumerate(valid_iter, start=1):
                 if use_cuda:
                     x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
                 z, x_hat = encoder_decoder(x, yb)
 
-                if (epoch % sample_every == 0):
-                    plot_samples(x, x_hat, prefix='valid_%d_%d' % (
-                        epoch, iteration))
+                plot_samples(x, x_hat, prefix='valid_%d_%d' % (
+                    epoch, iteration))
 
                 z_in = Variable(z.data, requires_grad=False)
                 y_hat = discriminator(z_in)
                 valid_advers_loss = mse_loss(x_hat, x) +\
                     le_val * bce_loss(y_in, 1 - yt)
                 valid_discrim_loss = bce_loss(y_hat, yt)
-                print(' Valid iteration %d (lambda_e = %.2e)' % (
-                    iteration, le_val.data[0]))
+                print(' Valid epoch %d, iter %d (lambda_e = %.2e)' % (
+                    epoch, iteration, le_val.data[0]))
                 print('  adv. loss = %.6f' % (valid_advers_loss.data[0]))
                 print('  dsc. loss = %.6f' % (valid_discrim_loss.data[0]))
+
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')
     print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))
