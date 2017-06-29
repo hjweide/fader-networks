@@ -208,6 +208,8 @@ def train_fader_network():
 
                 z_in = Variable(z.data, requires_grad=False)
                 y_hat = discriminator(z_in)
+
+                y_in = Variable(y_hat.data, requires_grad=False)
                 valid_advers_loss = mse_loss(x_hat, x) +\
                     le_val * bce_loss(y_in, 1 - yt)
                 valid_discrim_loss = bce_loss(y_hat, yt)
