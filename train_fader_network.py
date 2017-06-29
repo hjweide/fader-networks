@@ -147,6 +147,7 @@ def train_fader_network():
     mse_loss = nn.MSELoss(size_average=True)
     bce_loss = nn.BCELoss(size_average=True)
 
+    num_iters = 0
     lambda_e = np.linspace(0, 1e-4, 500000)
 
     try:
@@ -176,7 +177,7 @@ def train_fader_network():
 
                 # adversarial loss
                 y_in = Variable(y_hat.data, requires_grad=False)
-                le_idx = min(500000 - 1, epoch * (iteration + 1))
+                le_idx = min(500000 - 1, num_iters)
                 le_val = Variable(
                     torch.FloatTensor([lambda_e[le_idx]]).float(),
                     requires_grad=False)
@@ -196,6 +197,8 @@ def train_fader_network():
                     epoch, iteration, le_val.data[0]))
                 print('  adv. loss = %.6f' % (advers_loss.data[0]))
                 print('  dsc. loss = %.6f' % (discrim_loss.data[0]))
+
+                num_iters += 1
 
             for iteration, (x, yb, yt) in enumerate(valid_iter, start=1):
                 if use_cuda:
