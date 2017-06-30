@@ -25,8 +25,8 @@ def train_fader_network():
 
     train, valid, _ = split_train_val_test('data')
 
-    train_iter = DataLoader(train, batch_size=32, shuffle=True)
-    valid_iter = DataLoader(valid, batch_size=32, shuffle=False)
+    train_iter = DataLoader(train, batch_size=32, shuffle=True, num_workers=8)
+    valid_iter = DataLoader(valid, batch_size=32, shuffle=False, num_workers=8)
 
     max_epochs = 1000
     lr, beta1 = 2e-3, 0.5
@@ -42,7 +42,8 @@ def train_fader_network():
 
     try:
         for epoch in range(1, max_epochs):
-            print('Train epoch: %d' % (epoch))
+            encoder_decoder.train()
+            discriminator.train()
             for iteration, (x, yb, yt) in enumerate(train_iter, start=1):
                 if use_cuda:
                     x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
@@ -90,14 +91,16 @@ def train_fader_network():
 
                 num_iters += 1
 
+            encoder_decoder.eval()
+            discriminator.eval()
             for iteration, (x, yb, yt) in enumerate(valid_iter, start=1):
                 if use_cuda:
                     x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
                 z, x_hat = encoder_decoder(x, yb)
 
-                plot_samples(x, x_hat, prefix='valid_%d_%d' % (
-                    epoch, iteration))
+                #plot_samples(x, x_hat, prefix='valid_%d_%d' % (
+                #    epoch, iteration))
 
                 z_in = Variable(z.data, requires_grad=False)
                 y_hat = discriminator(z_in)
