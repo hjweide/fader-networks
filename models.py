@@ -101,13 +101,13 @@ class Discriminator(nn.Module):
         self.conv1 = nn.Conv2d(512, 512, kernel, stride, padding)
         self.fc1   = nn.Linear(512, 512)
         self.fc2   = nn.Linear(512, num_attr)
-        self.softmax = nn.Softmax()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, z):
         z = self.relu(self.conv1(z))
         z = z.view(-1, 512)
         z = self.drop(self.relu(self.fc1(z)))
         z = self.drop(self.relu(self.fc2(z)))
-        y_hat = self.softmax(z)
+        y_hat = self.sigmoid(z)
 
         return y_hat
