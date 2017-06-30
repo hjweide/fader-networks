@@ -121,7 +121,6 @@ def train_fader_network():
             if (epoch % sample_every == 0):
                 encoder_decoder.eval()
                 for iteration, (x, yb, ys, fp) in enumerate(test_iter, 1):
-                    print yb.size(), ys.size()
                     # randomly choose an attribute and swap the targets
                     to_swap = np.random.choice(test.attribute_names)
                     swap_idx, = np.where(test.attribute_names == to_swap)[0]
@@ -138,7 +137,6 @@ def train_fader_network():
                     fnames = ['%s.png' % splitext(basename(f))[0] for f in fp]
                     fpaths = [join(sample_dir, f) for f in fnames]
                     plot_samples(x, x_hat, fpaths)
-
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')
     print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))
