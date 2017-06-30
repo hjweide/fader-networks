@@ -5,28 +5,32 @@ import torch.optim as optim
 
 from data import split_train_val_test, plot_samples
 from models import EncoderDecoder, Discriminator
-from os.path import join
+from os import makedirs
+from os.path import basename, exists, join, splitext
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
 
 def train_fader_network():
     use_cuda = True
-    num_attr = 39
-    #sample_every = 10
-    encoder_decoder_fpath = join('data', 'weights', 'adver.params')
-    discriminator_fpath = join('data', 'weights', 'discr.params')
+    data_dir = 'data'
+    sample_every = 10
+    test_dir = join(data_dir, 'test-samples')
+    encoder_decoder_fpath = join(data_dir, 'weights', 'adver.params')
+    discriminator_fpath = join(data_dir, 'weights', 'discr.params')
+
+    train, valid, test = split_train_val_test(data_dir)
+
+    num_attr = train.attribute_names.shape[0]
     encoder_decoder = EncoderDecoder(num_attr)
     discriminator   = Discriminator(num_attr)
-
     if use_cuda:
         encoder_decoder.cuda()
         discriminator.cuda()
 
-    train, valid, _ = split_train_val_test('data')
-
     train_iter = DataLoader(train, batch_size=32, shuffle=True, num_workers=8)
     valid_iter = DataLoader(valid, batch_size=32, shuffle=False, num_workers=8)
+    test_iter  = DataLoader(test, batch_size=32, shuffle=False, num_workers=8)
 
     max_epochs = 1000
     lr, beta1 = 2e-3, 0.5
@@ -44,7 +48,7 @@ def train_fader_network():
         for epoch in range(1, max_epochs):
             encoder_decoder.train()
             discriminator.train()
-            for iteration, (x, yb, yt) in enumerate(train_iter, start=1):
+            for iteration, (x, yb, yt, _) in enumerate(train_iter, start=1):
                 if use_cuda:
                     x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
@@ -93,7 +97,7 @@ def train_fader_network():
 
             encoder_decoder.eval()
             discriminator.eval()
-            for iteration, (x, yb, yt) in enumerate(valid_iter, start=1):
+            for iteration, (x, yb, yt, _) in enumerate(valid_iter, start=1):
                 if use_cuda:
                     x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
@@ -113,6 +117,27 @@ def train_fader_network():
                     epoch, iteration, le_val.data[0]))
                 print('  adv. loss = %.6f' % (valid_advers_loss.data[0]))
                 print('  dsc. loss = %.6f' % (valid_discrim_loss.data[0]))
+
+            if (epoch % sample_every == 0):
+                encoder_decoder.eval()
+                for iteration, (x, yb, ys, fp) in enumerate(test_iter, 1):
+                    print yb.size(), ys.size()
+                    # randomly choose an attribute and swap the targets
+                    to_swap = np.random.choice(test.attribute_names)
+                    swap_idx, = np.where(test.attribute_names == to_swap)[0]
+                    # map (0, 1) --> (1, 0), and (1, 0) --> (0, 1)
+                    yb[:, 2 * swap_idx]     = 1 - yb[:, 2 * swap_idx]
+                    yb[:, 2 * swap_idx + 1] = 1 - yb[:, 2 * swap_idx + 1]
+                    if use_cuda:
+                        x, yb = x.cuda(), yb.cuda()
+                    x, yb = Variable(x), Variable(yb)
+                    _, x_hat = encoder_decoder(x, yb)
+                    sample_dir = join(test_dir, '%s' % epoch, '%s' % to_swap)
+                    if not exists(sample_dir):
+                        makedirs(sample_dir)
+                    fnames = ['%s.png' % splitext(basename(f))[0] for f in fp]
+                    fpaths = [join(sample_dir, f) for f in fnames]
+                    plot_samples(x, x_hat, fpaths)
 
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')

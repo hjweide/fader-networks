@@ -8,15 +8,16 @@ from torchvision.transforms import Compose, CenterCrop, ToTensor, Scale, Lambda
 from torchvision.transforms import RandomHorizontalFlip
 
 
-def plot_samples(x, x_hat, prefix=''):
+def plot_samples(x, x_hat, fpaths):
     x = x.data.cpu().numpy().transpose(0, 2, 3, 1)
     x_hat = x_hat.data.cpu().numpy().transpose(0, 2, 3, 1)
 
     for i in range(x.shape[0]):
-        fpath = join('data', 'samples', '%s_%d.png' % (prefix, i))
-        out = np.hstack((255 * ((x[i] + 1) / 2), 255 * ((x_hat[i] + 1) / 2)))
-        img = Image.fromarray(out.astype(np.uint8))
-        img.save(fpath)
+        img_in  = 255 * ((x[i] + 1) / 2)
+        img_out = 255 * ((x_hat[i] + 1) / 2)
+        stacked = np.hstack((img_in, img_out))
+        img = Image.fromarray(stacked.astype(np.uint8))
+        img.save(fpaths[i])
 
 
 def input_transform(crop_size):
