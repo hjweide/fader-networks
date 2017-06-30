@@ -12,7 +12,7 @@ def experiments():
     num_attr = 39
     to_swap = 'Blond_Hair'
     #to_swap = '5_o_Clock_Shadow'
-    encoder_decoder_fpath = join('data', 'weights', 'adver.params.1')
+    encoder_decoder_fpath = join('data', 'weights', 'adver.params')
     encoder_decoder = EncoderDecoder(num_attr)
     encoder_decoder.load_state_dict(torch.load(encoder_decoder_fpath))
     if use_cuda:
@@ -23,6 +23,7 @@ def experiments():
 
     swap_idx, = np.where(test.attribute_names == to_swap)[0]
 
+    encoder_decoder.eval()
     for iteration, (x, yb, yt) in enumerate(test_iter, start=1):
         yb[:, 2 * swap_idx]     = 1 - yb[:, 2 * swap_idx]
         yb[:, 2 * swap_idx + 1] = 1 - yb[:, 2 * swap_idx + 1]
