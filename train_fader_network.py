@@ -12,6 +12,7 @@ from torch.autograd import Variable
 
 
 def train_fader_network():
+    gpu_id = 1
     use_cuda = True
     data_dir = 'data'
     sample_every = 10
@@ -22,11 +23,11 @@ def train_fader_network():
     train, valid, test = split_train_val_test(data_dir)
 
     num_attr = train.attribute_names.shape[0]
-    encoder_decoder = EncoderDecoder(num_attr)
+    encoder_decoder = EncoderDecoder(num_attr, gpu_id=gpu_id)
     discriminator   = Discriminator(num_attr)
     if use_cuda:
-        encoder_decoder.cuda()
-        discriminator.cuda()
+        encoder_decoder.cuda(gpu_id)
+        discriminator.cuda(gpu_id)
 
     train_iter = DataLoader(train, batch_size=32, shuffle=True, num_workers=8)
     valid_iter = DataLoader(valid, batch_size=32, shuffle=False, num_workers=8)
@@ -50,7 +51,7 @@ def train_fader_network():
             discriminator.train()
             for iteration, (x, yb, yt, _) in enumerate(train_iter, start=1):
                 if use_cuda:
-                    x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
+                    x, yb, yt = x.cuda(gpu_id), yb.cuda(gpu_id), yt.cuda(gpu_id)
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
                 #print yb.data.cpu().numpy().shape
                 #print yt.data.cpu().numpy().shape
@@ -77,7 +78,7 @@ def train_fader_network():
                     torch.FloatTensor([lambda_e[le_idx]]).float(),
                     requires_grad=False)
                 if use_cuda:
-                    le_val = le_val.cuda()
+                    le_val = le_val.cuda(gpu_id)
                 advers_loss = mse_loss(x_hat, x) +\
                     le_val * bce_loss(y_in, 1 - yt)
                 advers_loss.backward()
@@ -99,7 +100,7 @@ def train_fader_network():
             discriminator.eval()
             for iteration, (x, yb, yt, _) in enumerate(valid_iter, start=1):
                 if use_cuda:
-                    x, yb, yt = x.cuda(), yb.cuda(), yt.cuda()
+                    x, yb, yt = x.cuda(gpu_id), yb.cuda(gpu_id), yt.cuda(gpu_id)
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
                 z, x_hat = encoder_decoder(x, yb)
 
@@ -128,7 +129,7 @@ def train_fader_network():
                     yb[:, 2 * swap_idx]     = 1 - yb[:, 2 * swap_idx]
                     yb[:, 2 * swap_idx + 1] = 1 - yb[:, 2 * swap_idx + 1]
                     if use_cuda:
-                        x, yb = x.cuda(), yb.cuda()
+                        x, yb = x.cuda(gpu_id), yb.cuda(gpu_id)
                     x, yb = Variable(x), Variable(yb)
                     _, x_hat = encoder_decoder(x, yb)
                     sample_dir = join(test_dir, '%s' % epoch, '%s' % to_swap)
@@ -140,9 +141,9 @@ def train_fader_network():
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')
     print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))
-    torch.save(encoder_decoder.state_dict(), encoder_decoder_fpath)
+    #torch.save(encoder_decoder.state_dict(), encoder_decoder_fpath)
     print('Saving discriminator parameters to %s' % (discriminator_fpath))
-    torch.save(discriminator.state_dict(), discriminator_fpath)
+    #torch.save(discriminator.state_dict(), discriminator_fpath)
 
 
 if __name__ == '__main__':

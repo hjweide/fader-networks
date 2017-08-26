@@ -4,10 +4,11 @@ from torch.autograd import Variable
 
 
 class EncoderDecoder(nn.Module):
-    def __init__(self, num_attr, use_cuda=True):
+    def __init__(self, num_attr, use_cuda=True, gpu_id=0):
         super(EncoderDecoder, self).__init__()
 
         self.use_cuda = use_cuda
+        self.gpu_id = gpu_id
         self.num_attr = num_attr
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
@@ -47,7 +48,7 @@ class EncoderDecoder(nn.Module):
     def _const_input(self, y, h, w):
         data = torch.ones((y.size()[0], y.size()[1], h, w)).float()
         if self.use_cuda:
-            data = data.cuda()
+            data = data.cuda(self.gpu_id)
         dummy = Variable(data, requires_grad=False)
         # broadcast over the height, width conv. dimensions
         z = y[:, :, None, None] * dummy
