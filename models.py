@@ -100,15 +100,15 @@ class Discriminator(nn.Module):
         kernel, stride, padding = (2, 2), (2, 2), (0, 0)
         #kernel, stride, padding = (2, 2), (2, 2), (1, 1)
         self.conv1 = nn.Conv2d(512, 512, kernel, stride, padding)
+        self.batch_norm1 = nn.BatchNorm2d(512)
         self.fc1   = nn.Linear(512, 512)
         self.fc2   = nn.Linear(512, num_attr)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, z):
-        z = self.relu(self.conv1(z))
+        z = self.drop(self.relu(self.batch_norm1(self.conv1(z))))
         z = z.view(-1, 512)
         z = self.drop(self.relu(self.fc1(z)))
-        z = self.drop(self.relu(self.fc2(z)))
-        y_hat = self.sigmoid(z)
+        y_hat = self.sigmoid(self.fc2(z))
 
         return y_hat
