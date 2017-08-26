@@ -51,7 +51,8 @@ def train_fader_network():
             discriminator.train()
             for iteration, (x, yb, yt, _) in enumerate(train_iter, start=1):
                 if use_cuda:
-                    x, yb, yt = x.cuda(gpu_id), yb.cuda(gpu_id), yt.cuda(gpu_id)
+                    x = x.cuda(gpu_id)
+                    yb, yt = yb.cuda(gpu_id), yt.cuda(gpu_id)
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
                 #print yb.data.cpu().numpy().shape
                 #print yt.data.cpu().numpy().shape
@@ -100,7 +101,8 @@ def train_fader_network():
             discriminator.eval()
             for iteration, (x, yb, yt, _) in enumerate(valid_iter, start=1):
                 if use_cuda:
-                    x, yb, yt = x.cuda(gpu_id), yb.cuda(gpu_id), yt.cuda(gpu_id)
+                    x = x.cuda(gpu_id)
+                    yb, yt = yb.cuda(gpu_id), yt.cuda(gpu_id)
                 x, yb, yt = Variable(x), Variable(yb), Variable(yt)
                 z, x_hat = encoder_decoder(x, yb)
 
@@ -141,9 +143,9 @@ def train_fader_network():
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')
     print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))
-    #torch.save(encoder_decoder.state_dict(), encoder_decoder_fpath)
+    torch.save(encoder_decoder.state_dict(), encoder_decoder_fpath)
     print('Saving discriminator parameters to %s' % (discriminator_fpath))
-    #torch.save(discriminator.state_dict(), discriminator_fpath)
+    torch.save(discriminator.state_dict(), discriminator_fpath)
 
 
 if __name__ == '__main__':
