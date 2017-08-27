@@ -8,3 +8,5 @@ the paper.  However, I also haven't implemented the *Model Selection* step from
 Section 4.  I'm releasing the code in its current state in the hope that it's
 useful to someone else.  Feedback and constructive criticism are welcome, and
 the same goes for pull requests.
+
+You can download the CelebA dataset [here](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html).
