@@ -142,6 +142,8 @@ def train_fader_network():
                     plot_samples(x, x_hat, fpaths)
     except KeyboardInterrupt:
         print('Caught Ctrl-C, interrupting training.')
+    except RuntimeError:
+        print('RuntimeError')
     print('Saving encoder/decoder parameters to %s' % (encoder_decoder_fpath))
     torch.save(encoder_decoder.state_dict(), encoder_decoder_fpath)
     print('Saving discriminator parameters to %s' % (discriminator_fpath))
